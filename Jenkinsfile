@@ -28,33 +28,43 @@ pipeline {
         stage("Tag & Push to DockerHub") {
             steps {
                 script {
+
                     withDockerRegistry(credentialsId: 'docker') {
-                        sh "docker tag starbucks dadda5/starbucks:${BUILD_NUMBER}"
-                        sh "docker push dadda5/starbucks:${BUILD_NUMBER}"
+
+                        sh "docker tag coffday dadda5/coffday:${BUILD_NUMBER}"
+                        sh "docker push dadda5/coffday:${BUILD_NUMBER}"
+
+                        sh "docker tag coffday dadda5/coffday:latest"
+                        sh "docker push dadda5/coffday:latest"
+                    }
+
+                    withCredentials([usernamePassword(
+                        credentialsId: 'github',
+                        usernameVariable: 'GIT_USER',
+                        passwordVariable: 'GIT_TOKEN'
+                    )]) {
+
+                        sh """
+                        rm -rf coffeday-manifests
+
+                        git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/BhairaviDH/coffeday-manifests.git
+
+                        sed -i 's|image: .*|image: dadda5/coffday:${BUILD_NUMBER}|' coffeday-manifests/k8s/deployment.yaml
+
+                        cd coffeday-manifests
+
+                        git config user.name "Jenkins"
+                        git config user.email "jenkins@local"
+
+                        git add k8s/deployment.yaml
+
+                        git commit -m "Update image to ${BUILD_NUMBER}" || true
+
+                        git push origin main
+                        """
                     }
                 }
             }
         }
-        stage('Deploy to GKE') {
-    steps {
-        withCredentials([file(credentialsId: 'gcp-key', variable: 'GOOGLE_KEY')]) {
-            sh """
-                gcloud auth activate-service-account --key-file=$GOOGLE_KEY
-
-                gcloud config set project planar-momentum-500811-e0
-
-                gcloud container clusters get-credentials clusterstarbut --region us-east1
-
-                kubectl apply -f k8s/
-
-                kubectl set image deployment/starbucks-deployment \
-                starbucks=dadda5/starbucks:${BUILD_NUMBER}
-
-                kubectl rollout status deployment/starbucks-deployment
-            """
-        }
     }
-}
-        
-}
 }
