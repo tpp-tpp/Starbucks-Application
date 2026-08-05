@@ -31,11 +31,11 @@ pipeline {
 
                     withDockerRegistry(credentialsId: 'docker') {
 
-                        sh "docker tag coffday dadda5/coffday:${BUILD_NUMBER}"
-                        sh "docker push dadda5/coffday:${BUILD_NUMBER}"
+                        sh "docker tag starbucks dadda5/starbucks:${BUILD_NUMBER}"
+                        sh "docker push dadda5/starbucks:${BUILD_NUMBER}"
 
-                        sh "docker tag coffday dadda5/coffday:latest"
-                        sh "docker push dadda5/coffday:latest"
+                        sh "docker tag starbucks dadda5/starbucks:latest"
+                        sh "docker push dadda5/starbucks:latest"
                     }
 
                     withCredentials([usernamePassword(
@@ -45,13 +45,13 @@ pipeline {
                     )]) {
 
                         sh """
-                        rm -rf coffeday-manifests
+                        rm -rf starbucks-manifests
 
-                        git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/BhairaviDH/coffeday-manifests.git
+                        git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/tpp-tpp/cafeday-manifests.git
 
-                        sed -i 's|image: .*|image: dadda5/coffday:${BUILD_NUMBER}|' coffeday-manifests/k8s/deployment.yaml
+                        sed -i 's|image: .*|image: dadda5/starbucks:${BUILD_NUMBER}|' cafeday-manifests/k8s/deployment.yaml
 
-                        cd coffeday-manifests
+                        cd cafeday-manifests
 
                         git config user.name "Jenkins"
                         git config user.email "jenkins@local"
