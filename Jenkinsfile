@@ -47,11 +47,11 @@ pipeline {
                         sh """
                         rm -rf starbucks-manifests
 
-                        git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/tpp-tpp/cafeday-manifests.git
+                        git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/tpp-tpp/cafeday-manifest.git
 
-                        sed -i 's|image: .*|image: dadda5/starbucks:${BUILD_NUMBER}|' cafeday-manifests/k8s/deployment.yaml
+                        sed -i 's|image: .*|image: dadda5/starbucks:${BUILD_NUMBER}|' cafeday-manifest/k8s/deployment.yaml
 
-                        cd cafeday-manifests
+                        cd cafeday-manifest
 
                         git config user.name "Jenkins"
                         git config user.email "jenkins@local"
