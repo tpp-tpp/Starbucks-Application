@@ -1,70 +1,70 @@
 pipeline {
     agent any
-    tools {
-        jdk 'jdk17'
-        nodejs 'node16'
+
+    environment {
+        AWS_REGION = 'ap-southeast-2'
+        ECR_REGISTRY = '347179352513.dkr.ecr.ap-southeast-2.amazonaws.com'
+        ECR_REPOSITORY = 'starbut'
     }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
     stages {
-        stage ("Clean Workspace") {
+        stage('Checkout') {
             steps {
-                cleanWs()
+                checkout scm
             }
         }
-        stage ("Git Checkout") {
-            steps {
-                git branch: 'main', url: 'https://github.com/tpp-tpp/Starbucks-Application.git'
-            }
-        }
-        stage("Install NPM Dependencies") {
-            steps {
-                sh "npm install"
-            }
-        }
-        stage("Build Docker Image") {
-            steps {
-                sh "docker build -t starbucks ."
-            }
-        }
-        stage("Tag & Push to DockerHub") {
+
+        stage('Build Docker Image') {
             steps {
                 script {
+                    env.IMAGE_TAG = sh(
+                        script: 'git rev-parse --short=7 HEAD',
+                        returnStdout: true
+                    ).trim()
 
-                    withDockerRegistry(credentialsId: 'docker') {
+                    env.IMAGE_URI =
+                        "${ECR_REGISTRY}/${ECR_REPOSITORY}"
 
-                        sh "docker tag starbucks dadda5/starbucks:${BUILD_NUMBER}"
-                        sh "docker push dadda5/starbucks:${BUILD_NUMBER}"
-
-                        sh "docker tag starbucks dadda5/starbucks:latest"
-                        sh "docker push dadda5/starbucks:latest"
-                    }
-
-                    withCredentials([usernamePassword(
-                        credentialsId: 'github',
-                        usernameVariable: 'GIT_USER',
-                        passwordVariable: 'GIT_TOKEN'
-                    )]) {
-
-                        sh """
-                        rm -rf starbucks-manifests
-
-                        git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/tpp-tpp/cafeday-manifest.git
-
-                        sed -i 's|image: .*|image: dadda5/starbucks:${BUILD_NUMBER}|' cafeday-manifest/k8s/deployment.yaml
-
-                        cd cafeday-manifest
-
-                        git config user.name "Jenkins"
-                        git config user.email "jenkins@local"
-
-                        git add k8s/deployment.yaml
-
-                        git commit -m "Update image to ${BUILD_NUMBER}" || true
-
-                        git push origin main
-                        """
-                    }
+                    sh '''
+                        docker build --pull \
+                          -t ${IMAGE_URI}:${IMAGE_TAG} .
+                    '''
                 }
             }
+        }
+
+        stage('Login to Amazon ECR') {
+            steps {
+                sh '''
+                    aws ecr get-login-password \
+                      --region ${AWS_REGION} |
+                    docker login \
+                      --username AWS \
+                      --password-stdin ${ECR_REGISTRY}
+                '''
+            }
+        }
+
+        stage('Push Image to ECR') {
+            steps {
+                sh 'docker push ${IMAGE_URI}:${IMAGE_TAG}'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Successfully pushed ${IMAGE_URI}:${IMAGE_TAG}"
+        }
+
+        always {
+            sh 'docker logout ${ECR_REGISTRY} || true'
         }
     }
 }
